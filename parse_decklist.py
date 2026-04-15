@@ -6,67 +6,69 @@ import os
 
 url = "https://api.scryfall.com/cards/collection"
 
-deck="devour.txt"
-deck_dir=deck.split(".")[0]
 
-os.makedirs(deck_dir, exist_ok=True)
+def parse_decklist(deck):
+    deck_dir=deck.split(".")[0]
 
-f=open(deck, 'r')
-datavec = []
+    os.makedirs(deck_dir, exist_ok=True)
 
-for line in f:
-    if line== '\n':
-        continue 
-    split= line.split(' ', 1)
-    if int(split[0]) ==1:
-        data= {
-            'name': split[1].rstrip('\n') 
-            }
-        datavec.append(data)
-    else:
-        number= int(split[0])
-        for i in range(number):
+    f=open(deck, 'r')
+    datavec = []
+
+    for line in f:
+        if line== '\n':
+            continue 
+        split= line.split(' ', 1)
+        if int(split[0]) ==1:
             data= {
                 'name': split[1].rstrip('\n') 
-            }
+                }
             datavec.append(data)
-list_c= [datavec[i:i+50] for i in range(0, len(datavec), 50)]
-print(f"len of datavec{len(datavec)}")
-jsonstrvec=[]
-for list in list_c:
-    payload = {
-        "identifiers":
-            list
-    }
+        else:
+            number= int(split[0])
+            for i in range(number):
+                data= {
+                    'name': split[1].rstrip('\n') 
+                }
+                datavec.append(data)
+    list_c= [datavec[i:i+50] for i in range(0, len(datavec), 50)]
+    print(f"len of datavec{len(datavec)}")
+    jsonstrvec=[]
+    for list in list_c:
+        payload = {
+            "identifiers":
+                list
+        }
 
-    response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload)
 
-    if response.status_code == 200:
-        data = response.json()
-        for card in data["data"]:
-            name = card["name"]
-    # Some cards (like double-faced) don't have image_uris at top level
-            if "image_uris" in card:
-                img_url = card["image_uris"]["normal"]
-            else:
-        # fallback for double-faced cards
-                img_url = card["card_faces"][0]["image_uris"]["small"]
+        if response.status_code == 200:
+            data = response.json()
+            for card in data["data"]:
+                name = card["name"]
+        # Some cards (like double-faced) don't have image_uris at top level
+                if "image_uris" in card:
+                    img_url = card["image_uris"]["normal"]
+                else:
+            # fallback for double-faced cards
+                    img_url = card["card_faces"][0]["image_uris"]["small"]
 
-            filename = name.replace(" ", "_").replace(",", "").replace("/", "_") + ".png"
-            filepath = os.path.join(deck_dir, filename)
+                filename = name.replace(" ", "_").replace(",", "").replace("/", "_") + ".png"
+                filepath = os.path.join(deck_dir, filename)
 
-            img_data = requests.get(img_url).content
+                img_data = requests.get(img_url).content
 
-            with open(filepath, "wb") as f:
-                f.write(img_data)
+                with open(filepath, "wb") as f:
+                    f.write(img_data)
 
-            print(f"Saved {filename}")    
-    elif response.status_code == 429:
-        time.sleep(31)
-        print("rate limited")
-    else:
-        print("Error:", response.status_code, response.text)
+                print(f"Saved {filename}")    
+        elif response.status_code == 429:
+            time.sleep(31)
+            print("rate limited")
+        else:
+            print("Error:", response.status_code, response.text)
 
-    time.sleep(.51)
+        time.sleep(.51)
+        return data 
 
 

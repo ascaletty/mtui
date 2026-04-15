@@ -28,23 +28,10 @@ from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, Label, Static
+from textual.widgets import Footer, Header, Input, Label, Static, ListView, ListItem
 from textual_image.widget import Image
+from parse_decklist import parse_decklist
 
-
-
-# Optional: textual-imageview for image rendering.
-# Install with:  pip install textual-imageview
-try:
-    from textual_imageview.viewer import ImageViewer
-    HAS_IMAGE_VIEWER = True
-except ImportError:
-    HAS_IMAGE_VIEWER = False
-
-
-# ---------------------------------------------------------------------------
-# Focusable pane widget
-# ---------------------------------------------------------------------------
 
 class Pane(Static):
     """A bordered, focusable pane that highlights when focused."""
@@ -133,7 +120,7 @@ class CalApp(App):
     }
 
     #right-col {
-        width: 30%;
+        width: 50%;
         height: 100%;
         layout: vertical;
     }
@@ -146,6 +133,23 @@ class CalApp(App):
     #top-right:focus {
         border: solid yellow;
     }
+    #card-list {
+    border: solid white;
+    padding: 0 1;
+    height: 100%;
+    background: $surface;
+}
+
+#card-list:focus {
+    border: solid yellow;
+}
+
+    #preview {
+    border: solid white;
+    padding: 0 1;
+    height: 100%;
+    background: $surface;
+}
 
     #bottom-right {
         height: 1fr;
@@ -174,10 +178,14 @@ class CalApp(App):
         Binding("tab",     "focus_next",    "Next pane",     show=True),
         Binding("shift+tab","focus_previous","Prev pane",    show=True),
         Binding("/",       "activate_search","Search",       show=True),
+
+        Binding(":",       "activate_command","Command",       show=True),
     ]
 
     # Track submitted search messages
     messages: reactive[list[str]] = reactive(list)
+    decks: reactive[list[dict]] = reactive(list)
+    preview: reactive(str)= reactive(str)
 
     # ---------------------------------------------------------------------------
     # Build UI
@@ -189,27 +197,27 @@ class CalApp(App):
 
         with Horizontal(id="main-row"):
             # Left large pane
-            yield Pane(pane_title="left", id="left-pane")
-
+            # yield Pane(pane_title="left", id="left-pane")
+            with Pane(id= "left-pane"):
+                yield ListView(id="card-list")
             # Right column: image on top, generic bottom pane
             with Vertical(id="right-col"):
                 with Pane(pane_title="preview", id="top-right"):
-                    yield Image("./devour/Anger.png")
+                    yield Image(id="preview")
+        yield SearchBar(id="command")
 
-        yield Footer()
+    def build_list_view(self)-> ListView:
+        list_view= self.query_one("#card-list");
+        for deck in self.decks:
+            for card in deck["data"]:
+                item = ListItem(Label(card["name"]))
+                list_view.append(item)
+        return list_view
 
-
-    # def _build_image_widget(self) -> Pane:
-    #     """Return an ImageViewer (wrapped in Pane) if available, else a placeholder Pane."""
-    #     if HAS_IMAGE_VIEWER and IMAGE_PATH.exists():
-    #         img = Image.open(IMAGE_PATH)
-    #         img = img.resize((300, 420), Image.NEAREST)
-    #         viewer = ImageViewer(img)
-    #         return viewer
-    #     else:
-    #         p = Pane(pane_title="top", id="top-right")
-    #         p.update(f"[dim]Image preview\n({IMAGE_PATH})\n\npip install textual-imageview[/dim]")
-    #         return p
+    def build_image(self)-> ListView: 
+        image= self.query_one("#preview")
+        image.image= "devour/" + self.preview + ".png"
+        return image
 
     def on_mount(self) -> None:
         # Give initial focus to the left pane
@@ -226,7 +234,6 @@ class CalApp(App):
     # ---------------------------------------------------------------------------
     # Search bar activation
     # ---------------------------------------------------------------------------
-
     def action_activate_search(self) -> None:
         """Press '/' to jump into the search bar."""
         search = self.query_one("#search", SearchBar)
@@ -258,6 +265,67 @@ class CalApp(App):
             search.disabled = True
             self.query_one("#left-pane").focus()
             event.stop()
+    
+    def action_activate_command(self)-> None:
+        "Execute commands"
+        search = self.query_one("#command", SearchBar)
+        search.disabled = False
+        search.focus();
+
+    @on(Input.Submitted, "#command")
+    def on_command_submitted(self, event: Input.Submitted)-> None:
+        text= event.value.strip()
+        s= text.split(" ")
+        if s[0]== "load":
+            response= parse_decklist(s[1])
+            self.decks= [*self.decks, response]
+            self.notify(f"Deck: {s[1]}", title="Loaded")
+            self.build_list_view()
+        search = self.query_one("#command", SearchBar)
+        search.clear()
+        search.disabled = True
+        # Return focus to left pane
+        self.query_one("#left-pane").focus()
+    @on(ListView.Selected, "#card-list")
+    def on_card_selected(self, event: ListView.Selected):
+        idx = event.index
+        self.notify(f"{idx}")
+        # this 0 could be more than 0 if we have more than one deck
+        msg=self.decks[0]
+        self.notify(f"{msg}")
+
+        msg= msg["data"]
+
+        self.notify(f"{msg}")
+        msg= msg[idx]
+
+        self.notify(f"{msg}")
+        msg= msg["name"]
+        
+        self.notify(f"{msg}")
+        self.preview= msg
+        self.build_image()
+
+
+    # download + display (or call kitty icat)
+
+
+    @on(Input.Changed, "#command")
+    def on_search_escape(self, event: Input.Changed) -> None:
+        # Esc is handled by Textual's Input natively (clears focus)
+        pass
+
+    def on_key_c(self, event) -> None:
+        search = self.query_one("#command", SearchBar)
+        # If Esc pressed while search is active, deactivate it
+        if event.key == "escape" and not search.disabled:
+            search.clear()
+            search.disabled = True
+            self.query_one("#left-pane").focus()
+            event.stop()
+
+            
+
 
 
 # ---------------------------------------------------------------------------
