@@ -35,7 +35,7 @@ def parse_decklist(deck):
     return datavec
 
 def parse_response(datavec):
-    list_c= [datavec[i:i+50] for i in range(0, len(datavec), 50)]
+    list_c= [datavec[i:i+75] for i in range(0, len(datavec), 75)]
     print(f"len of datavec{len(datavec)}")
     jsonvec=[]
     for list in list_c:
