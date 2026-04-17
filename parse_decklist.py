@@ -73,3 +73,5 @@ def parse_response(datavec):
 
     time.sleep(.51)
     result = {k: v for d in jsonvec for k, v in d.items()} 
+def search(card_name):
+
