@@ -31,6 +31,7 @@ from textual.reactive import reactive
 from textual.widgets import Footer, Header, Input, Label, Static, ListView, ListItem
 from textual_image.widget import Image
 from parse_decklist import parse_decklist
+from parse_decklist import parse_response
 
 
 class Pane(Static):
@@ -209,14 +210,15 @@ class CalApp(App):
     def build_list_view(self)-> ListView:
         list_view= self.query_one("#card-list");
         for deck in self.decks:
-            for card in deck["data"]:
+            for card in deck:
                 item = ListItem(Label(card["name"]))
                 list_view.append(item)
         return list_view
 
     def build_image(self)-> ListView: 
         image= self.query_one("#preview")
-        image.image= "devour/" + self.preview + ".png"
+        filename = self.preview.replace(" ", "_").replace(",", "").replace("/", "_") + ".png"
+        image.image= "devour/" + filename
         return image
 
     def on_mount(self) -> None:
@@ -289,20 +291,14 @@ class CalApp(App):
     @on(ListView.Selected, "#card-list")
     def on_card_selected(self, event: ListView.Selected):
         idx = event.index
-        self.notify(f"{idx}")
-        # this 0 could be more than 0 if we have more than one deck
         msg=self.decks[0]
-        self.notify(f"{msg}")
 
         msg= msg["data"]
 
-        self.notify(f"{msg}")
         msg= msg[idx]
 
-        self.notify(f"{msg}")
         msg= msg["name"]
         
-        self.notify(f"{msg}")
         self.preview= msg
         self.build_image()
 
